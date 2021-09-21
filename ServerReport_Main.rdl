@@ -170,26 +170,53 @@ unpivot(val FOR pars IN (
           <DataField>val</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
+        <Field Name="error">
+          <DataField>error</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
       </Fields>
       <Query>
         <DataSourceName>dsMain</DataSourceName>
         <CommandText>DECLARE @outval VARCHAR(36);
-/* Get power plan if set by group policy [Git Hub Issue #1620] */						
-EXEC master.sys.xp_regread @rootkey = 'HKEY_LOCAL_MACHINE',@key = 'SOFTWARE\Policies\Microsoft\Power\PowerSettings',@value_name = 'ActivePowerScheme',@value = @outval OUTPUT;
+
+/* Get power plan if set by group policy [Git Hub Issue #1620] */
+EXEC master.sys.xp_regread @rootkey = 'HKEY_LOCAL_MACHINE'
+	,@key = 'SOFTWARE\Policies\Microsoft\Power\PowerSettings'
+	,@value_name = 'ActivePowerScheme'
+	,@value = @outval OUTPUT;
+
 IF @outval IS NULL /* If power plan was not set by group policy, get local value [Git Hub Issue #1620]*/
-EXEC master.sys.xp_regread @rootkey = 'HKEY_LOCAL_MACHINE',@key = 'SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes',@value_name = 'ActivePowerScheme',@value = @outval OUTPUT;
+	EXEC master.sys.xp_regread @rootkey = 'HKEY_LOCAL_MACHINE'
+		,@key = 'SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes'
+		,@value_name = 'ActivePowerScheme'
+		,@value = @outval OUTPUT;
+
 /*
 SELECT 'OS Version' [pars], rtrim(stuff(@@version, 1, patindex('% on %', @@version) + 3, '')) [val]
 */
-SELECT 'OS Version' [pars], stuff(stuff(@@version,len(@@version)-1,len(@@version),')'), 1, patindex('% on %', @@version) + 3, '') [val]
+SELECT 'OS Version' [pars]
+	,stuff(stuff(@@version, len(@@version) - 1, len(@@version), ')'), 1, patindex('% on %', @@version) + 3, '') [val]
+	,0 [error]
+
 UNION ALL
-SELECT 'Power Mode',CASE @outval
-						WHEN 'a1841308-3541-4fab-bc81-f71556f20b4a' THEN 'Power Saving'
-						WHEN '381b4222-f694-41f0-9685-ff5bb260df2e'	THEN 'Balanced'
-						WHEN '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' THEN 'High Performance'
-						WHEN 'e9a42b02-d5df-448d-aa00-03f14749eb61' THEN 'Ultimate Performance'
-						ELSE 'Unknown'
-					END</CommandText>
+
+SELECT 'Power Mode'
+	,CASE @outval
+		WHEN 'a1841308-3541-4fab-bc81-f71556f20b4a'
+			THEN 'Power Saving'
+		WHEN '381b4222-f694-41f0-9685-ff5bb260df2e'
+			THEN 'Balanced'
+		WHEN '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
+			THEN 'High Performance'
+		WHEN 'e9a42b02-d5df-448d-aa00-03f14749eb61'
+			THEN 'Ultimate Performance'
+		ELSE 'Unknown'
+		END
+	,CASE 
+		WHEN @outval &lt;&gt; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
+			THEN 1
+		ELSE 0
+		END</CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
@@ -805,7 +832,7 @@ OPTION (RECOMPILE)</CommandText>
           </Paragraph>
         </Paragraphs>
         <rd:DefaultName>Textbox10</rd:DefaultName>
-        <Top>191.73825mm</Top>
+        <Top>192.05576mm</Top>
         <Left>3.88405mm</Left>
         <Height>29.8125mm</Height>
         <Width>341.17711mm</Width>
@@ -855,7 +882,7 @@ OPTION (RECOMPILE)</CommandText>
           <PaddingBottom>2pt</PaddingBottom>
         </Style>
       </Textbox>
-      <Textbox Name="Textbox12">
+      <Textbox Name="txtMaint">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
@@ -872,11 +899,10 @@ OPTION (RECOMPILE)</CommandText>
             <Style />
           </Paragraph>
         </Paragraphs>
-        <rd:DefaultName>Textbox12</rd:DefaultName>
-        <Top>53.93131mm</Top>
+        <Top>54.2488mm</Top>
         <Left>3.88408mm</Left>
         <Height>6.52917mm</Height>
-        <Width>51.19375mm</Width>
+        <Width>51.19376mm</Width>
         <ZIndex>3</ZIndex>
         <Style>
           <Border>
@@ -905,7 +931,7 @@ OPTION (RECOMPILE)</CommandText>
           </Paragraph>
         </Paragraphs>
         <rd:DefaultName>Textbox13</rd:DefaultName>
-        <Top>129.12298mm</Top>
+        <Top>129.44047mm</Top>
         <Left>3.88407mm</Left>
         <Height>23.19792mm</Height>
         <Width>341.17711mm</Width>
@@ -937,7 +963,7 @@ OPTION (RECOMPILE)</CommandText>
           </Paragraph>
         </Paragraphs>
         <rd:DefaultName>Textbox14</rd:DefaultName>
-        <Top>156.0195mm</Top>
+        <Top>156.337mm</Top>
         <Left>3.88407mm</Left>
         <Height>31.92917mm</Height>
         <Width>341.17709mm</Width>
@@ -954,38 +980,6 @@ OPTION (RECOMPILE)</CommandText>
       </Textbox>
       <Rectangle Name="Rectangle1">
         <ReportItems>
-          <Textbox Name="Textbox15">
-            <CanGrow>true</CanGrow>
-            <KeepTogether>true</KeepTogether>
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>Host information</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontWeight>Bold</FontWeight>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style />
-              </Paragraph>
-            </Paragraphs>
-            <rd:DefaultName>Textbox15</rd:DefaultName>
-            <Top>0mm</Top>
-            <Left>0mm</Left>
-            <Height>5.73542mm</Height>
-            <Width>30.82086mm</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-              <PaddingLeft>2pt</PaddingLeft>
-              <PaddingRight>2pt</PaddingRight>
-              <PaddingTop>2pt</PaddingTop>
-              <PaddingBottom>2pt</PaddingBottom>
-            </Style>
-          </Textbox>
           <Tablix Name="Tablix1">
             <TablixBody>
               <TablixColumns>
@@ -1104,11 +1098,10 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsHost</DataSetName>
-            <Top>6.79376mm</Top>
+            <Top>1.07875mm</Top>
             <Left>0mm</Left>
             <Height>5.99999mm</Height>
             <Width>69.0499mm</Width>
-            <ZIndex>1</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1233,11 +1226,11 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsHost2</DataSetName>
-            <Top>6.79376mm</Top>
+            <Top>1.07875mm</Top>
             <Left>78.38444mm</Left>
             <Height>5.99999mm</Height>
             <Width>97.88957mm</Width>
-            <ZIndex>2</ZIndex>
+            <ZIndex>1</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1316,6 +1309,7 @@ OPTION (RECOMPILE)</CommandText>
                                   <Value>=Fields!val.Value</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
+                                    <Color>=iif(Fields!pars.Value="Power Mode" AND Fields!val.Value&lt;&gt;"High Performance","Red","Black")</Color>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -1364,11 +1358,11 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsHost3</DataSetName>
-            <Top>6.79376mm</Top>
+            <Top>1.07875mm</Top>
             <Left>184.35003mm</Left>
             <Height>5.99999mm</Height>
             <Width>140.22281mm</Width>
-            <ZIndex>3</ZIndex>
+            <ZIndex>2</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1377,11 +1371,15 @@ OPTION (RECOMPILE)</CommandText>
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>11.92389mm</Top>
+        <Top>19.5439mm</Top>
         <Left>3.88407mm</Left>
-        <Height>15.73958mm</Height>
+        <Height>7.80208mm</Height>
         <Width>341.17711mm</Width>
         <ZIndex>6</ZIndex>
+        <Visibility>
+          <Hidden>true</Hidden>
+          <ToggleItem>txtHostInfo</ToggleItem>
+        </Visibility>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1390,38 +1388,6 @@ OPTION (RECOMPILE)</CommandText>
       </Rectangle>
       <Rectangle Name="Rectangle2">
         <ReportItems>
-          <Textbox Name="Textbox9">
-            <CanGrow>true</CanGrow>
-            <KeepTogether>true</KeepTogether>
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>SQL Configuration and settings</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontWeight>Bold</FontWeight>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style />
-              </Paragraph>
-            </Paragraphs>
-            <rd:DefaultName>Textbox9</rd:DefaultName>
-            <Top>0mm</Top>
-            <Left>0.12919mm</Left>
-            <Height>6mm</Height>
-            <Width>54.63334mm</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-              <PaddingLeft>2pt</PaddingLeft>
-              <PaddingRight>2pt</PaddingRight>
-              <PaddingTop>2pt</PaddingTop>
-              <PaddingBottom>2pt</PaddingBottom>
-            </Style>
-          </Textbox>
           <Tablix Name="Tablix4">
             <TablixBody>
               <TablixColumns>
@@ -1541,11 +1507,10 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsSQL1</DataSetName>
-            <Top>7.05833mm</Top>
+            <Top>1.66082mm</Top>
             <Left>0.25838mm</Left>
             <Height>5.99999mm</Height>
             <Width>103.38439mm</Width>
-            <ZIndex>1</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1673,11 +1638,11 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsSQL2</DataSetName>
-            <Top>7.05833mm</Top>
+            <Top>1.66082mm</Top>
             <Left>111.71877mm</Left>
             <Height>5.99999mm</Height>
             <Width>77.78123mm</Width>
-            <ZIndex>2</ZIndex>
+            <ZIndex>1</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1805,11 +1770,11 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsSQL3</DataSetName>
-            <Top>7.05833mm</Top>
+            <Top>1.66082mm</Top>
             <Left>197.37912mm</Left>
             <Height>5.99999mm</Height>
             <Width>97.09599mm</Width>
-            <ZIndex>3</ZIndex>
+            <ZIndex>2</ZIndex>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -1941,11 +1906,11 @@ OPTION (RECOMPILE)</CommandText>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsSQL4</DataSetName>
-            <Top>7.05833mm</Top>
+            <Top>1.66082mm</Top>
             <Left>305.58755mm</Left>
             <Height>12mm</Height>
             <Width>25mm</Width>
-            <ZIndex>4</ZIndex>
+            <ZIndex>3</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsSQL4")&gt;0,false,true)</Hidden>
             </Visibility>
@@ -1957,11 +1922,15 @@ OPTION (RECOMPILE)</CommandText>
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>30.607mm</Top>
+        <Top>37.59201mm</Top>
         <Left>3.6257mm</Left>
-        <Height>21.56042mm</Height>
+        <Height>14.94583mm</Height>
         <Width>341.3063mm</Width>
         <ZIndex>7</ZIndex>
+        <Visibility>
+          <Hidden>true</Hidden>
+          <ToggleItem>txtSQLConfig</ToggleItem>
+        </Visibility>
         <Style>
           <Border>
             <Style>None</Style>
@@ -2718,17 +2687,115 @@ OPTION (RECOMPILE)</CommandText>
           </Textbox>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>62.22437mm</Top>
+        <Top>62.54187mm</Top>
         <Left>3.6257mm</Left>
         <Height>63.1mm</Height>
         <Width>341.43549mm</Width>
         <ZIndex>8</ZIndex>
+        <Visibility>
+          <Hidden>true</Hidden>
+          <ToggleItem>txtMaint</ToggleItem>
+        </Visibility>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
         </Style>
       </Rectangle>
+      <Textbox Name="txtSQLConfig">
+        <CanGrow>true</CanGrow>
+        <KeepTogether>true</KeepTogether>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>SQL Configuration and settings</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontWeight>Bold</FontWeight>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Top>29.74486mm</Top>
+        <Left>3.6257mm</Left>
+        <Height>6mm</Height>
+        <Width>59.925mm</Width>
+        <ZIndex>9</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>2pt</PaddingLeft>
+          <PaddingRight>2pt</PaddingRight>
+          <PaddingTop>2pt</PaddingTop>
+          <PaddingBottom>2pt</PaddingBottom>
+        </Style>
+      </Textbox>
+      <Textbox Name="txtHostInfo">
+        <CanGrow>true</CanGrow>
+        <KeepTogether>true</KeepTogether>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>Host information</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontWeight>Bold</FontWeight>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Top>11.92389mm</Top>
+        <Left>3.6257mm</Left>
+        <Height>5.73542mm</Height>
+        <Width>39.2813mm</Width>
+        <ZIndex>10</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>2pt</PaddingLeft>
+          <PaddingRight>2pt</PaddingRight>
+          <PaddingTop>2pt</PaddingTop>
+          <PaddingBottom>2pt</PaddingBottom>
+        </Style>
+      </Textbox>
+      <Image Name="Image1">
+        <Source>Embedded</Source>
+        <Value>=iif(CountRows("dsMaint1")=0,"nav_plain_green_16","nav_plain_red_16")</Value>
+        <Sizing>FitProportional</Sizing>
+        <Top>55.84824mm</Top>
+        <Left>59.97575mm</Left>
+        <Height>4.33002mm</Height>
+        <Width>3.57495mm</Width>
+        <ZIndex>11</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Image>
+      <Image Name="Image2">
+        <Source>Embedded</Source>
+        <Value>=iif(Sum(Fields!error.Value, "dsHost3")=0,"nav_plain_green_16","nav_plain_red_16")</Value>
+        <Sizing>FitProportional</Sizing>
+        <Top>12.87639mm</Top>
+        <Left>44.67088mm</Left>
+        <Height>4.33002mm</Height>
+        <Width>3.57495mm</Width>
+        <ZIndex>12</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Image>
     </ReportItems>
     <Height>261.14375mm</Height>
     <Style>
@@ -2745,6 +2812,18 @@ OPTION (RECOMPILE)</CommandText>
     <BottomMargin>25.4mm</BottomMargin>
     <Style />
   </Page>
+  <EmbeddedImages>
+    <EmbeddedImage Name="nav_plain_red_16">
+      <MIMEType>image/png</MIMEType>
+      <ImageData>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADK0lEQVR4XlWT709TZxTH7z+zvTDxzWQMBgiVlsFoEDqJtiBg0UKGBPmVjkQqBqgdKETXgEGGIFQkQUoVQ5ZsMxFBC5dSK7S0Oio438+MzDeEz869hi2e5OSee57v+Z5znnMeZW9vD020r6bx5Btu3w/g9U1y/Y5PV6/vnvj8vN7Z+QSr/Si6R+Tv3V3G/A8ZmvbT7/HQ1XiBtooKfigro7OuDk9XJ0P3Zxl7MKdjD0TRsv7z4QM3xu8yMePnx3PneOhyEfZ6CfX387y7mydOJxPVdnoqK7g7G+C6YLUYvQKNQMvsCzxiuKaGoASvSFBIqgi53ax0dLDU0sLj2lp+sdnwlpYy+Wie8cDcR4L4VpLBmQfcOl/PQv15gq2thNrbiUhg5NIlwm1tqE1NLDkc/C7tzB8/zqC9mkFJ+sfbP1FuS1+TckFz1lMsCmi1oYF1KTl+8SIJ0bjY0cZGwo4anpWX86sQTBsM3JsJMDozi9IzPomvs4sFKU2129mor2dDgC/y8lhL+4rQkS9YTUlBzchgWXxPi4r4zWTkTruLXpmOckUIRr+vY8lSQlgC17KyJDCVF9mZvDQc1VWz175OY0XIFg4fZkGIhqvO4JkQAtfAENMNF1gxm1FTUwlnpPPyWDbR/Fw2C026RvONrB87ypqcqSlHWJQkU3IP7QO3UJy9fcx7eliWMrXMEUMWsQITCUshW6VFuiYsBUQLjPpZxGRiOT2ducuXcfb2o9wYHmHKH2Dp88/0DOumHOLFBSStxexUleqaPFlMvCifaOE3xE58x7NDh5iSyXl/HkFZj8Vo6nKzKLOOpH1JNM9AQiOwlfDOYeXd2VO6/dpq4dVpKxtGA4tNzXpMLJH4uEiubjc/jY6h2qzEjDm8KvmWLalg+8xJ3jpOs1NbRfJsJXFzPqqMW8N2uK/8v4m7sttVsgNXBwZZdbZKC2be
+lJ1gu7qcbbtNyCxsmvNYlSXTMJWC1WL+W+WDx9Tc6qRE1nXk5k2W+66xea2HzatywX19uk87a5bF+uv9+08f08Gf1k4wGKRZMuXk5pKamalrttgt4lNVVYfu7+/rT1+TfwGDcctVcLE/PwAAAFF0RVh0Q29tbWVudABDb3B5cmlnaHQgSU5DT1JTIEdtYkggKHd3dy5pY29uZXhwZXJpZW5jZS5jb20pIC0gVW5saWNlbnNlZCBwcmV2aWV3IGltYWdltppppgAAADh0RVh0Q29weXJpZ2h0AENvcHlyaWdodCBJTkNPUlMgR21iSCAod3d3Lmljb25leHBlcmllbmNlLmNvbSlOzplOAAAAWnpUWHRDb21tZW50AAB4nHPOL6gsykzPKFHw9HP2DwpWcM9N8lDQKC8v18tMzs9LrShILcpMzUtO1UvOz9VU0FUIzcvJTE7NK05NUSgoSi3LTC1XyMxNTE8FALiPGiScvJjjAAAAQXpUWHRDb3B5cmlnaHQAAHicc84vqCzKTM8oUfD0c/YPClZwz03yUNAoLy/Xy0zOz0utKEgtykzNS07VS87P1QQAfTYQaBzd5o8AAAAASUVORK5CYII=</ImageData>
+    </EmbeddedImage>
+    <EmbeddedImage Name="nav_plain_green_16">
+      <MIMEType>image/png</MIMEType>
+      <ImageData>iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADOUlEQVR4XlWT+0+TZxTH+8/slyVLNhwiOFdHjWROohCN3FvArlrAAr2ilNJESyG0IlLlsrpRsAI1naWACtvkJqWjMERNsy4DhV0Sf5oZmb8QPnve17DFk5y85znP93suz3uOYmdnB0mkr6Sp9RcEvh3lxu0QvsEhfAPD3AyGZN+vm1vvYKWDQvYI+Xt7m8HoOF/fjeDytmKy11JhUKOpKaa2oQq3p03cjXJ77L6M3ROFlPWfN2/wBYcJhiMYXTVcC7sILX1DZCXIUNyPb7IFq/88ekc5d+5FRWUjMkeuQAogZb4zOo6xQ0/frIcb0y30zLdxc66Vzmkn7ikL9ogeZ8RApauA4egEA6ISOUBq/SX+8BiNvRacExdo+95Kx3wTXYtOrscdeBcu4Z4xYp/UYbxXii6YR31XteCMs7H1GwrpcfpHI5jDGuwPdbjm6vAu2eh80sj1tUaurlpxJ+pwLpzDMlWKPpyHJpAjcwZEOwqveGXPiIfasTM0zlRyJVFNw3IxuvgRihfSOTP/IYVzaZTNZqF9dJSqByeouJtDy5AL72AIRXv/CI6QDcNUPrbFEtSPD1IY20fZUgbq5QOoVw5QlsigOJZOwcxH5N//gLPjOViC1bQHRABXb4DmiA39o1wKZ9MpWdyPZiUT7donaJ8rZa0UtuanTEri6QKThvrBIUyhKiSuwtHRhXeincIf9lEU+xjNciZfPj2EPpVN1bpKVn3qMGeFT6pI96OK0ulMWqKXcVz1oejsuyV+SZTch++JDPupWD3I+Z8/48KLI9T//rmskq1LKjm3lk3d6knyJt8nIDhd/lsoniWTYtKaafrOQPFSmij3bQDDy6OYXx3H9OoL2a795RjW5Cm0K0rsUzUyJ5lKvR2kpssufL39XIpVUvE0S5SsEqQcTH8cp+HPfOxbBVxcL0D/XMXFWDm+nn6ar7T8P4nb
+YraLNOV0XOumbcGCVvRr2silYfMUts186jeOUb6WgfuxScYUqTVInP9GeW+ZjGYrJ0+cpruvh955D/5nrbJKdvdXvfKdWWD+ev363WXaO0ntxONxATKTfVjFp1lKWbOVKswmM4lEQobu7u7Kqy/Jv+HX1gpA8MqTAAAAUXRFWHRDb21tZW50AENvcHlyaWdodCBJTkNPUlMgR21iSCAod3d3Lmljb25leHBlcmllbmNlLmNvbSkgLSBVbmxpY2Vuc2VkIHByZXZpZXcgaW1hZ2W2mmmmAAAAOHRFWHRDb3B5cmlnaHQAQ29weXJpZ2h0IElOQ09SUyBHbWJIICh3d3cuaWNvbmV4cGVyaWVuY2UuY29tKU7OmU4AAABaelRYdENvbW1lbnQAAHicc84vqCzKTM8oUfD0c/YPClZwz03yUNAoLy/Xy0zOz0utKEgtykzNS07VS87P1VTQVQjNy8lMTs0rTk1RKChKLctMLVfIzE1MTwUAuI8aJJy8mOMAAABBelRYdENvcHlyaWdodAAAeJxzzi+oLMpMzyhR8PRz9g8KVnDPTfJQ0CgvL9fLTM7PS60oSC3KTM1LTtVLzs/VBAB9NhBoHN3mjwAAAABJRU5ErkJggg==</ImageData>
+    </EmbeddedImage>
+  </EmbeddedImages>
   <rd:ReportID>dd84d6f5-d6eb-485a-9e46-b9541d425493</rd:ReportID>
   <rd:ReportUnitType>Mm</rd:ReportUnitType>
 </Report>
