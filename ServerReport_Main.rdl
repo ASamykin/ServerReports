@@ -949,7 +949,7 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
       <Fields>
         <Field Name="db">
           <DataField>db</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
+          <rd:TypeName>System.Int32</rd:TypeName>
         </Field>
         <Field Name="dt">
           <DataField>dt</DataField>
@@ -957,6 +957,10 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
         </Field>
         <Field Name="comment">
           <DataField>comment</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="dblist">
+          <DataField>dblist</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
       </Fields>
@@ -992,10 +996,14 @@ while exists (select top 1 1 from @dbs)
 		set @db=''
 	end
 
-select db
-	,dt
-	,iif(dt='19000101','never done',convert(varchar(20),dt,106)) [comment]
-from @dbcc 
+select 
+	count(d1.db) [db]
+	,d1.dt
+	,iif(dt='19000101','never done',convert(varchar(20),d1.dt,106)) [comment]
+	,stuff((select char(10)+'* '+quotename(db) as [data()] from @dbcc d2 where d2.dt=d1.dt order by db for xml path('')),1,1,'') [dblist]
+from @dbcc d1
+group by d1.dt
+	,iif(d1.dt='19000101','never done',convert(varchar(20),d1.dt,106))
 </CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
@@ -3639,7 +3647,7 @@ from @dbcc
             <TablixBody>
               <TablixColumns>
                 <TablixColumn>
-                  <Width>1.9685in</Width>
+                  <Width>1.22892in</Width>
                 </TablixColumn>
                 <TablixColumn>
                   <Width>1.65383in</Width>
@@ -3661,7 +3669,7 @@ from @dbcc
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Database</Value>
+                                  <Value>Databases</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                   </Style>
@@ -3765,11 +3773,12 @@ from @dbcc
                                 </TextRun>
                               </TextRuns>
                               <Style>
-                                <TextAlign>Left</TextAlign>
+                                <TextAlign>Center</TextAlign>
                               </Style>
                             </Paragraph>
                           </Paragraphs>
                           <rd:DefaultName>Category</rd:DefaultName>
+                          <ToolTip>=Fields!dblist.Value</ToolTip>
                           <Style>
                             <Border>
                               <Color>LightGrey</Color>
@@ -3861,7 +3870,7 @@ from @dbcc
             <Top>42.30342mm</Top>
             <Left>1.45213mm</Left>
             <Height>11.99998mm</Height>
-            <Width>92.00735mm</Width>
+            <Width>73.22185mm</Width>
             <ZIndex>9</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint4")=0,true,false)</Hidden>
@@ -4021,6 +4030,188 @@ from @dbcc
           </Border>
         </Style>
       </Image>
+      <Tablix Name="Tablix11">
+        <TablixCorner>
+          <TablixCornerRows>
+            <TablixCornerRow>
+              <TablixCornerCell>
+                <CellContents>
+                  <Textbox Name="Textbox44">
+                    <CanGrow>true</CanGrow>
+                    <KeepTogether>true</KeepTogether>
+                    <Paragraphs>
+                      <Paragraph>
+                        <TextRuns>
+                          <TextRun>
+                            <Value>Databases</Value>
+                            <Style />
+                          </TextRun>
+                        </TextRuns>
+                        <Style />
+                      </Paragraph>
+                    </Paragraphs>
+                    <rd:DefaultName>Textbox44</rd:DefaultName>
+                    <Style>
+                      <Border>
+                        <Color>LightGrey</Color>
+                        <Style>Solid</Style>
+                      </Border>
+                      <PaddingLeft>2pt</PaddingLeft>
+                      <PaddingRight>2pt</PaddingRight>
+                      <PaddingTop>2pt</PaddingTop>
+                      <PaddingBottom>2pt</PaddingBottom>
+                    </Style>
+                  </Textbox>
+                </CellContents>
+              </TablixCornerCell>
+            </TablixCornerRow>
+          </TablixCornerRows>
+        </TablixCorner>
+        <TablixBody>
+          <TablixColumns>
+            <TablixColumn>
+              <Width>0.98425in</Width>
+            </TablixColumn>
+          </TablixColumns>
+          <TablixRows>
+            <TablixRow>
+              <Height>0.23622in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="comment">
+                      <CanGrow>true</CanGrow>
+                      <KeepTogether>true</KeepTogether>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!comment.Value</Value>
+                              <Style />
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                      </Paragraphs>
+                      <rd:DefaultName>comment</rd:DefaultName>
+                      <Style>
+                        <Border>
+                          <Color>LightGrey</Color>
+                          <Style>Solid</Style>
+                        </Border>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>2pt</PaddingTop>
+                        <PaddingBottom>2pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+          </TablixRows>
+        </TablixBody>
+        <TablixColumnHierarchy>
+          <TablixMembers>
+            <TablixMember>
+              <Group Name="ColumnGroup">
+                <GroupExpressions>
+                  <GroupExpression />
+                </GroupExpressions>
+              </Group>
+              <TablixHeader>
+                <Size>0.23622in</Size>
+                <CellContents>
+                  <Textbox Name="Textbox42">
+                    <CanGrow>true</CanGrow>
+                    <KeepTogether>true</KeepTogether>
+                    <Paragraphs>
+                      <Paragraph>
+                        <TextRuns>
+                          <TextRun>
+                            <Value>Last Check</Value>
+                            <Style />
+                          </TextRun>
+                        </TextRuns>
+                        <Style />
+                      </Paragraph>
+                    </Paragraphs>
+                    <rd:DefaultName>Textbox42</rd:DefaultName>
+                    <Style>
+                      <Border>
+                        <Color>LightGrey</Color>
+                        <Style>Solid</Style>
+                      </Border>
+                      <PaddingLeft>2pt</PaddingLeft>
+                      <PaddingRight>2pt</PaddingRight>
+                      <PaddingTop>2pt</PaddingTop>
+                      <PaddingBottom>2pt</PaddingBottom>
+                    </Style>
+                  </Textbox>
+                </CellContents>
+              </TablixHeader>
+            </TablixMember>
+          </TablixMembers>
+        </TablixColumnHierarchy>
+        <TablixRowHierarchy>
+          <TablixMembers>
+            <TablixMember>
+              <Group Name="db">
+                <GroupExpressions>
+                  <GroupExpression>=Fields!db.Value</GroupExpression>
+                </GroupExpressions>
+              </Group>
+              <SortExpressions>
+                <SortExpression>
+                  <Value>=Fields!db.Value</Value>
+                </SortExpression>
+              </SortExpressions>
+              <TablixHeader>
+                <Size>0.98425in</Size>
+                <CellContents>
+                  <Textbox Name="db">
+                    <CanGrow>true</CanGrow>
+                    <KeepTogether>true</KeepTogether>
+                    <Paragraphs>
+                      <Paragraph>
+                        <TextRuns>
+                          <TextRun>
+                            <Value>=CountDistinct(Fields!db.Value)</Value>
+                            <Style />
+                          </TextRun>
+                        </TextRuns>
+                        <Style />
+                      </Paragraph>
+                    </Paragraphs>
+                    <rd:DefaultName>db</rd:DefaultName>
+                    <Style>
+                      <Border>
+                        <Color>LightGrey</Color>
+                        <Style>Solid</Style>
+                      </Border>
+                      <PaddingLeft>2pt</PaddingLeft>
+                      <PaddingRight>2pt</PaddingRight>
+                      <PaddingTop>2pt</PaddingTop>
+                      <PaddingBottom>2pt</PaddingBottom>
+                    </Style>
+                  </Textbox>
+                </CellContents>
+              </TablixHeader>
+            </TablixMember>
+          </TablixMembers>
+        </TablixRowHierarchy>
+        <DataSetName>dsMaint4</DataSetName>
+        <Top>233.807mm</Top>
+        <Left>231.69034mm</Left>
+        <Height>12mm</Height>
+        <Width>50mm</Width>
+        <ZIndex>13</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Tablix>
     </ReportItems>
     <Height>261.14375mm</Height>
     <Style>
