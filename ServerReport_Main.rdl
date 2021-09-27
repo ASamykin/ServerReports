@@ -823,6 +823,128 @@ group by
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
+    <DataSet Name="dsMaint3">
+      <Fields>
+        <Field Name="ErrorNum">
+          <DataField>ErrorNum</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="Amount">
+          <DataField>Amount</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="text">
+          <DataField>text</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>dsMain</DataSourceName>
+        <CommandText>/*errorlogs*/
+set nocount on;
+declare @tbl table 
+(dt datetime,proc_info varchar(30),msg varchar(512) )
+declare @dt date = getdate()
+declare @defect tinyint = 0
+
+if left(convert(varchar(20),SERVERPROPERTY('ProductVersion')),3)='10.'
+	set @defect=1  /* on SQL2008&amp;R2 xp_readerrorlog doesn't filter by date and return all rows*/
+
+insert into @tbl (dt,proc_info,msg)
+exec xp_readerrorlog 0,1,N'Error: ',null,@dt 
+
+
+if @defect=1   /*for sql2008*/
+	delete @tbl 
+	where dt&lt;@dt
+		or msg not like 'Error: %'
+
+------------------------------------
+insert into @tbl (dt,proc_info,msg)
+exec xp_readerrorlog 0,1,N'taking longer',null,@dt 
+
+
+if @defect=1   /*for sql2008*/
+	delete @tbl 
+	where 
+	(dt&lt;@dt
+		or msg not like '%taking longer%')
+		and msg not like 'Error: %'
+
+if exists (select top 1 1 from @tbl where msg like '%taking longer%')
+	begin
+		insert into @tbl (dt,proc_info,msg)
+		select 
+			@dt,
+			'system'
+			,convert(varchar(10),sum(convert(int,left(replace(msg,'SQL Server has encountered ',''),charindex(' occur',msg)-len('SQL Server has encountered ')-2)))) 
+				+' I/O delays on file '+SUBSTRING(msg,charindex('[',msg),charindex(']',msg)-charindex('[',msg)+1)
+				+' of database '
+				+case
+					when left(stuff(msg,1,charindex(' in database ',msg),''),500) like '%(%)%' then substring(msg,charindex(' in database ',msg)+len(' in database '),charindex('.  The OS',msg)-charindex(' in database ',msg)-len(' in database '))
+					else db_name(substring(msg,charindex('in database id',msg)+len('in database id')+1,charindex('.  The OS file',msg)-charindex('in database id',msg)-len('in database id')-1))
+					end 
+				+'.' [msg]
+		from @tbl 
+		where msg like '%taking longer%'
+		group by [msg]
+
+		delete @tbl
+		where msg like '%taking longer%'
+	end
+--------------------
+
+insert into @tbl (dt,proc_info,msg)
+exec xp_readerrorlog 0,1,N'non-yielding',null,@dt 
+
+
+if @defect=1    /*for sql2008*/
+	delete @tbl 
+	where 
+	(dt&lt;@dt
+		or msg not like '%non-yielding%')
+	and msg not like 'Error: %'
+	and msg not like '%taking longer%'
+
+
+if exists (select top 1 1 from @tbl where msg like '%non-yielding%')
+	begin
+		insert into @tbl (dt,proc_info,msg)
+		select @dt,'system',convert(varchar(10),count(1)) +' non-yielding process(-es) detected on Scheduler X.' 
+		from @tbl 
+		where msg like '%appears to be non-yielding%'
+		group by [msg]
+
+		delete @tbl
+		where msg like '%appears to be non-yielding%'
+		
+	end
+
+--------------------
+;with logged as (
+select 
+	case 
+		when msg not like 'Error:%Severity:%State:%' then -1
+		else SUBSTRING(msg,charindex(' ',msg,1)+1,charindex(',',msg,1)-charindex(' ',msg,1)-1)
+	end  [ErrorNum]
+	,left(msg,100) [ErrorText]
+	,count(1) [Amount]
+from @tbl
+group by 
+case 
+		when msg not like 'Error:%Severity:%State:%' then -1
+		else SUBSTRING(msg,charindex(' ',msg,1)+1,charindex(',',msg,1)-charindex(' ',msg,1)-1)
+	end 
+	,left(msg,100)
+)
+select l.ErrorNum
+	,l.Amount / (/*sql2008: 3 times more records than needed*/ case when @defect=1 then 3 else 1 end) [Amount]
+	,isnull(m.text,'[Unknown] '+l.ErrorText) [text]
+from logged l 
+left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+    </DataSet>
   </DataSets>
   <Body>
     <ReportItems>
@@ -1996,18 +2118,23 @@ group by
               <Paragraph>
                 <TextRuns>
                   <TextRun>
-                    <Value>Errors from Errorlog, login failed, etc</Value>
-                    <Style />
+                    <Value>Errors today</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
                   </TextRun>
                 </TextRuns>
-                <Style />
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox22</rd:DefaultName>
-            <Top>9.12846mm</Top>
-            <Left>264.84174mm</Left>
+            <Top>29.5979mm</Top>
+            <Left>149.88338mm</Left>
             <Height>6mm</Height>
-            <Width>65.74584mm</Width>
+            <Width>144.59154mm</Width>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -2721,8 +2848,8 @@ group by
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox1</rd:DefaultName>
-            <Top>37.26801mm</Top>
-            <Left>255.84588mm</Left>
+            <Top>32.4118mm</Top>
+            <Left>1.45213mm</Left>
             <Height>6mm</Height>
             <Width>25mm</Width>
             <ZIndex>3</ZIndex>
@@ -2759,7 +2886,7 @@ group by
             <Top>0.8354mm</Top>
             <Left>149.88337mm</Left>
             <Height>6.52917mm</Height>
-            <Width>101.78766mm</Width>
+            <Width>144.59157mm</Width>
             <ZIndex>4</ZIndex>
             <Style>
               <Border>
@@ -2781,7 +2908,7 @@ group by
                   <Width>0.55717in</Width>
                 </TablixColumn>
                 <TablixColumn>
-                  <Width>1.8905in</Width>
+                  <Width>3.5757in</Width>
                 </TablixColumn>
               </TablixColumns>
               <TablixRows>
@@ -3075,7 +3202,7 @@ group by
             <Top>9.12845mm</Top>
             <Left>149.88337mm</Left>
             <Height>12mm</Height>
-            <Width>101.78765mm</Width>
+            <Width>144.59157mm</Width>
             <ZIndex>5</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint2")=0,true,false)</Hidden>
@@ -3108,10 +3235,367 @@ group by
             <Top>21.83401mm</Top>
             <Left>149.88337mm</Left>
             <Height>6mm</Height>
-            <Width>101.78766mm</Width>
+            <Width>144.59155mm</Width>
             <ZIndex>6</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint2")=0,false,true)</Hidden>
+            </Visibility>
+            <Style>
+              <Border>
+                <Color>LightGrey</Color>
+                <Style>Solid</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Tablix Name="tblFailedJobs2">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.04917in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>0.55717in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>4.08624in</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.23622in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox4">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Error</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox3</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <BackgroundColor>WhiteSmoke</BackgroundColor>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox26">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Amount</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox26</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <BackgroundColor>WhiteSmoke</BackgroundColor>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox9">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Message</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox8</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <BackgroundColor>WhiteSmoke</BackgroundColor>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.23622in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Category2">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!ErrorNum.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Category</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Failed2">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!Amount.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Failed</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="JobNames2">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!text.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>JobNames</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <TablixMember>
+                  <Group Name="Details9" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>dsMaint3</DataSetName>
+            <Top>37.36179mm</Top>
+            <Left>149.88338mm</Left>
+            <Height>11.99998mm</Height>
+            <Width>144.59155mm</Width>
+            <ZIndex>7</ZIndex>
+            <Visibility>
+              <Hidden>=iif(CountRows("dsMaint3")=0,true,false)</Hidden>
+            </Visibility>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Textbox Name="Textbox15">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>No errors registered today yet.</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <rd:DefaultName>Textbox12</rd:DefaultName>
+            <Top>50.77288mm</Top>
+            <Left>149.88339mm</Left>
+            <Height>6mm</Height>
+            <Width>144.59155mm</Width>
+            <ZIndex>8</ZIndex>
+            <Visibility>
+              <Hidden>=iif(CountRows("dsMaint3")=0,false,true)</Hidden>
             </Visibility>
             <Style>
               <Border>
