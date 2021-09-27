@@ -799,7 +799,7 @@ OPTION (RECOMPILE)</CommandText>
         <CommandText>select 
 	c.name [Category]
 	,count(1) [Failed]
-	/**/,(SELECT CHAR(10) + '* ' + isnull(j1.name, '') + ' ' + quotename(convert(VARCHAR(10), count(1))) AS [data()]
+	,stuff((SELECT CHAR(10) + '* ' + isnull(j1.name, '') + ' ' + quotename(convert(VARCHAR(10), count(1))) AS [data()]
 			FROM msdb.dbo.sysjobhistory h1
 			JOIN msdb.dbo.sysjobs j1 ON h1.job_id = j1.job_id
 			WHERE j1.category_id = j.category_id
@@ -811,7 +811,7 @@ OPTION (RECOMPILE)</CommandText>
 				AND h1.run_date = convert(INT, convert(VARCHAR(20), getdate(), 112))
 			GROUP BY CHAR(10) + '* ' + isnull(j1.name, '')
 			FOR XML path('')
-			) [JobNames]/**/
+			),1,1,'') [JobNames]
 from msdb.dbo.sysjobs j
 join msdb.dbo.syscategories c on j.category_id = c.category_id
 where job_id in(
@@ -942,6 +942,61 @@ select l.ErrorNum
 	,isnull(m.text,'[Unknown] '+l.ErrorText) [text]
 from logged l 
 left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+    </DataSet>
+    <DataSet Name="dsMaint4">
+      <Fields>
+        <Field Name="db">
+          <DataField>db</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="dt">
+          <DataField>dt</DataField>
+          <rd:TypeName>System.DateTime</rd:TypeName>
+        </Field>
+        <Field Name="comment">
+          <DataField>comment</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>dsMain</DataSourceName>
+        <CommandText>declare @dbs table (db varchar(255))
+declare @tmp table (parentobject varchar(100),obj varchar(100),field varchar(50),valu varchar(255))
+declare @dbcc table (db sysname,dt datetime)
+declare @db varchar(255)
+declare @cmd nvarchar(256)
+insert into @dbs (db)
+select name from sys.databases where state_desc in (N'EMERGENCY',N'ONLINE')
+
+while exists (select top 1 1 from @dbs)
+	begin
+		select top 1 @db=db from @dbs
+		set @cmd=FORMATMESSAGE('dbcc dbinfo(''%s'') with tableresults',@db) 
+		
+		insert into @tmp(parentobject,obj,field,valu)
+		exec(@cmd)
+
+		insert into @dbcc (db,dt)
+		select @db,valu 
+		from @tmp
+		where field='dbi_dbccLastKnownGood'
+
+		delete @tmp
+
+		delete @dbs	
+		where db=@db
+
+		set @cmd=''
+		set @db=''
+	end
+
+select db
+	,dt
+	,iif(dt='19000101','never done',convert(varchar(20),dt,106)) [comment]
+from @dbcc 
+</CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
@@ -2132,9 +2187,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </Paragraphs>
             <rd:DefaultName>Textbox22</rd:DefaultName>
             <Top>29.5979mm</Top>
-            <Left>149.88338mm</Left>
+            <Left>151.15337mm</Left>
             <Height>6mm</Height>
-            <Width>144.59154mm</Width>
+            <Width>174.94772mm</Width>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -2840,18 +2895,23 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
               <Paragraph>
                 <TextRuns>
                   <TextRun>
-                    <Value>Check dbs, reindex</Value>
-                    <Style />
+                    <Value>DB Consistency checks</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
                   </TextRun>
                 </TextRuns>
-                <Style />
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox1</rd:DefaultName>
-            <Top>32.4118mm</Top>
+            <Top>34.89231mm</Top>
             <Left>1.45213mm</Left>
             <Height>6mm</Height>
-            <Width>25mm</Width>
+            <Width>92.00735mm</Width>
             <ZIndex>3</ZIndex>
             <Style>
               <Border>
@@ -2884,9 +2944,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
             <Top>0.8354mm</Top>
-            <Left>149.88337mm</Left>
+            <Left>151.15336mm</Left>
             <Height>6.52917mm</Height>
-            <Width>144.59157mm</Width>
+            <Width>174.94773mm</Width>
             <ZIndex>4</ZIndex>
             <Style>
               <Border>
@@ -2908,7 +2968,7 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                   <Width>0.55717in</Width>
                 </TablixColumn>
                 <TablixColumn>
-                  <Width>3.5757in</Width>
+                  <Width>4.77082in</Width>
                 </TablixColumn>
               </TablixColumns>
               <TablixRows>
@@ -2941,12 +3001,6 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                               <Color>LightGrey</Color>
                               <Style>Solid</Style>
                             </Border>
-                            <TopBorder>
-                              <Style>None</Style>
-                            </TopBorder>
-                            <LeftBorder>
-                              <Style>None</Style>
-                            </LeftBorder>
                             <RightBorder>
                               <Style>None</Style>
                             </RightBorder>
@@ -2985,15 +3039,6 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                               <Color>LightGrey</Color>
                               <Style>Solid</Style>
                             </Border>
-                            <TopBorder>
-                              <Style>None</Style>
-                            </TopBorder>
-                            <LeftBorder>
-                              <Style>None</Style>
-                            </LeftBorder>
-                            <RightBorder>
-                              <Style>None</Style>
-                            </RightBorder>
                             <BackgroundColor>WhiteSmoke</BackgroundColor>
                             <PaddingLeft>2pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
@@ -3029,15 +3074,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                               <Color>LightGrey</Color>
                               <Style>Solid</Style>
                             </Border>
-                            <TopBorder>
-                              <Style>None</Style>
-                            </TopBorder>
                             <LeftBorder>
                               <Style>None</Style>
                             </LeftBorder>
-                            <RightBorder>
-                              <Style>None</Style>
-                            </RightBorder>
                             <BackgroundColor>WhiteSmoke</BackgroundColor>
                             <PaddingLeft>2pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
@@ -3079,9 +3118,6 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                             <TopBorder>
                               <Style>None</Style>
                             </TopBorder>
-                            <LeftBorder>
-                              <Style>None</Style>
-                            </LeftBorder>
                             <RightBorder>
                               <Style>None</Style>
                             </RightBorder>
@@ -3122,12 +3158,6 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                             <TopBorder>
                               <Style>None</Style>
                             </TopBorder>
-                            <LeftBorder>
-                              <Style>None</Style>
-                            </LeftBorder>
-                            <RightBorder>
-                              <Style>None</Style>
-                            </RightBorder>
                             <PaddingLeft>2pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
                             <PaddingTop>2pt</PaddingTop>
@@ -3166,9 +3196,6 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                             <LeftBorder>
                               <Style>None</Style>
                             </LeftBorder>
-                            <RightBorder>
-                              <Style>None</Style>
-                            </RightBorder>
                             <PaddingLeft>2pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
                             <PaddingTop>2pt</PaddingTop>
@@ -3200,9 +3227,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </TablixRowHierarchy>
             <DataSetName>dsMaint2</DataSetName>
             <Top>9.12845mm</Top>
-            <Left>149.88337mm</Left>
+            <Left>151.15336mm</Left>
             <Height>12mm</Height>
-            <Width>144.59157mm</Width>
+            <Width>174.94777mm</Width>
             <ZIndex>5</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint2")=0,true,false)</Hidden>
@@ -3233,9 +3260,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
             <Top>21.83401mm</Top>
-            <Left>149.88337mm</Left>
+            <Left>151.15336mm</Left>
             <Height>6mm</Height>
-            <Width>144.59155mm</Width>
+            <Width>174.94773mm</Width>
             <ZIndex>6</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint2")=0,false,true)</Hidden>
@@ -3261,7 +3288,7 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
                   <Width>0.55717in</Width>
                 </TablixColumn>
                 <TablixColumn>
-                  <Width>4.08624in</Width>
+                  <Width>5.28136in</Width>
                 </TablixColumn>
               </TablixColumns>
               <TablixRows>
@@ -3557,9 +3584,9 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </TablixRowHierarchy>
             <DataSetName>dsMaint3</DataSetName>
             <Top>37.36179mm</Top>
-            <Left>149.88338mm</Left>
+            <Left>151.15337mm</Left>
             <Height>11.99998mm</Height>
-            <Width>144.59155mm</Width>
+            <Width>174.94773mm</Width>
             <ZIndex>7</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint3")=0,true,false)</Hidden>
@@ -3590,12 +3617,287 @@ left join sys.messages m on l.ErrorNum=m.message_id and language_id=1033</Comman
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
             <Top>50.77288mm</Top>
-            <Left>149.88339mm</Left>
+            <Left>151.15338mm</Left>
             <Height>6mm</Height>
-            <Width>144.59155mm</Width>
+            <Width>174.94773mm</Width>
             <ZIndex>8</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint3")=0,false,true)</Hidden>
+            </Visibility>
+            <Style>
+              <Border>
+                <Color>LightGrey</Color>
+                <Style>Solid</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Tablix Name="tblFailedJobs3">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.9685in</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>1.65383in</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.23622in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox6">
+                          <CanGrow>true</CanGrow>
+                          <UserSort>
+                            <SortExpression>=Fields!db.Value</SortExpression>
+                          </UserSort>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Database</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox3</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <BackgroundColor>WhiteSmoke</BackgroundColor>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Textbox28">
+                          <CanGrow>true</CanGrow>
+                          <UserSort>
+                            <SortExpression>=Fields!dt.Value</SortExpression>
+                          </UserSort>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Last Check</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Textbox26</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <BackgroundColor>WhiteSmoke</BackgroundColor>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <TablixRow>
+                  <Height>0.23622in</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Category3">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!db.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Category</rd:DefaultName>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="Failed3">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!comment.Value</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Center</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <rd:DefaultName>Failed</rd:DefaultName>
+                          <ToolTip>dt</ToolTip>
+                          <Style>
+                            <Border>
+                              <Color>LightGrey</Color>
+                              <Style>Solid</Style>
+                            </Border>
+                            <TopBorder>
+                              <Style>None</Style>
+                            </TopBorder>
+                            <LeftBorder>
+                              <Style>None</Style>
+                            </LeftBorder>
+                            <RightBorder>
+                              <Style>None</Style>
+                            </RightBorder>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <TablixMember>
+                  <Group Name="Details10" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>dsMaint4</DataSetName>
+            <Top>42.30342mm</Top>
+            <Left>1.45213mm</Left>
+            <Height>11.99998mm</Height>
+            <Width>92.00735mm</Width>
+            <ZIndex>9</ZIndex>
+            <Visibility>
+              <Hidden>=iif(CountRows("dsMaint4")=0,true,false)</Hidden>
+            </Visibility>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Textbox Name="Textbox18">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>All backups are recently made.</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <rd:DefaultName>Textbox12</rd:DefaultName>
+            <Top>27.4812mm</Top>
+            <Left>1.45208mm</Left>
+            <Height>6mm</Height>
+            <Width>94.84364mm</Width>
+            <ZIndex>10</ZIndex>
+            <Visibility>
+              <Hidden>=iif(CountRows("dsMaint1")=0,false,true)</Hidden>
             </Visibility>
             <Style>
               <Border>
