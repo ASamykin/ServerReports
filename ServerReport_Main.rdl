@@ -1312,9 +1312,9 @@ declare @drive_info table (
 	volume_mount_point nvarchar(512),
 	file_system_type nvarchar(512),
 	logical_volume_name nvarchar(512),
-	[Total_Size_GB] DECIMAL(18,2),
-	[Available_Size_GB] DECIMAL(18,2),
-	[Space_Free_Percent] DECIMAL(18,2))
+	[Total_Size_GB] DECIMAL(18,1),
+	[Available_Size_GB] DECIMAL(18,1),
+	[Space_Free_Percent] DECIMAL(18,1))
 
 
 insert into @drives (drive,MBFree)
@@ -1341,8 +1341,8 @@ if convert(varchar(20),SERVERPROPERTY('ProductVersion')) not like '10.0.%'
 						vs.volume_mount_point
 					, vs.file_system_type
 					, vs.logical_volume_name
-					, CONVERT(DECIMAL(18,2),vs.total_bytes/1024/1024/1024.0) AS [Total_Size_GB]
-					, CONVERT(DECIMAL(18,2),vs.available_bytes/1024/1024/1024.0) AS [Available_Size_GB]
+					, CONVERT(DECIMAL(18,1),vs.total_bytes/1024/1024/1024.0) AS [Total_Size_GB]
+					, CONVERT(DECIMAL(18,1),vs.available_bytes/1024/1024/1024.0) AS [Available_Size_GB]
 					, CAST(CAST(vs.available_bytes AS FLOAT)/ CAST(vs.total_bytes AS FLOAT) AS DECIMAL(18,2)) * 100 AS [Space_Free_Percent] 
 					FROM files AS f WITH (NOLOCK)
 					CROSS APPLY sys.dm_os_volume_stats(f.database_id, f.[file_id]) AS vs 
@@ -1450,8 +1450,6 @@ left join tab t on t.Drive=d.[volume_mount_point]
 
 order by d.[volume_mount_point]
 option (recompile)
-
-
 
 
 
@@ -7249,7 +7247,7 @@ option (recompile)
             <TablixBody>
               <TablixColumns>
                 <TablixColumn>
-                  <Width>0.98425in</Width>
+                  <Width>0.72516in</Width>
                 </TablixColumn>
                 <TablixColumn>
                   <Width>0.98425in</Width>
@@ -7264,10 +7262,10 @@ option (recompile)
                   <Width>0.98425in</Width>
                 </TablixColumn>
                 <TablixColumn>
-                  <Width>0.98425in</Width>
+                  <Width>0.64169in</Width>
                 </TablixColumn>
                 <TablixColumn>
-                  <Width>0.98425in</Width>
+                  <Width>2.06956in</Width>
                 </TablixColumn>
                 <TablixColumn>
                   <Width>0.98425in</Width>
@@ -7567,7 +7565,7 @@ option (recompile)
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Type Amount</Value>
+                                  <Value>DB Files &amp; Amount</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                   </Style>
@@ -8060,7 +8058,6 @@ AVG</Value>
                             <PaddingBottom>2pt</PaddingBottom>
                           </Style>
                         </Textbox>
-                        <rd:Selected>true</rd:Selected>
                       </CellContents>
                     </TablixCell>
                     <TablixCell>
@@ -8106,7 +8103,6 @@ AVG</Value>
                             <PaddingBottom>2pt</PaddingBottom>
                           </Style>
                         </Textbox>
-                        <rd:Selected>true</rd:Selected>
                       </CellContents>
                     </TablixCell>
                     <TablixCell>
@@ -8497,7 +8493,7 @@ AVG</Value>
             <Top>6.35278mm</Top>
             <Left>3.63402mm</Left>
             <Height>12mm</Height>
-            <Width>324.99989mm</Width>
+            <Width>337.28471mm</Width>
             <ZIndex>1</ZIndex>
             <Style>
               <Border>
