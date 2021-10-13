@@ -1998,7 +1998,7 @@ WHERE counter_name = 'Page life expectancy'
             </TablixRowHierarchy>
             <DataSetName>dsHost2</DataSetName>
             <Top>1.07875mm</Top>
-            <Left>78.38445mm</Left>
+            <Left>78.38444mm</Left>
             <Height>5.99999mm</Height>
             <Width>97.88957mm</Width>
             <ZIndex>1</ZIndex>
@@ -2130,7 +2130,7 @@ WHERE counter_name = 'Page life expectancy'
             </TablixRowHierarchy>
             <DataSetName>dsHost3</DataSetName>
             <Top>1.07875mm</Top>
-            <Left>184.34999mm</Left>
+            <Left>184.35001mm</Left>
             <Height>5.99999mm</Height>
             <Width>140.22274mm</Width>
             <ZIndex>2</ZIndex>
@@ -2143,7 +2143,7 @@ WHERE counter_name = 'Page life expectancy'
         </ReportItems>
         <KeepTogether>true</KeepTogether>
         <Top>253.20367mm</Top>
-        <Left>2.87411mm</Left>
+        <Left>3.50911mm</Left>
         <Height>7.80208mm</Height>
         <Width>341.17711mm</Width>
         <ZIndex>3</ZIndex>
@@ -2542,7 +2542,7 @@ WHERE counter_name = 'Page life expectancy'
             </TablixRowHierarchy>
             <DataSetName>dsSQL3</DataSetName>
             <Top>1.66082mm</Top>
-            <Left>197.37912mm</Left>
+            <Left>197.37915mm</Left>
             <Height>5.99999mm</Height>
             <Width>97.09582mm</Width>
             <ZIndex>2</ZIndex>
@@ -2678,7 +2678,7 @@ WHERE counter_name = 'Page life expectancy'
             </TablixRowHierarchy>
             <DataSetName>dsSQL4</DataSetName>
             <Top>1.66082mm</Top>
-            <Left>305.58755mm</Left>
+            <Left>305.58757mm</Left>
             <Height>11.99998mm</Height>
             <Width>24.99995mm</Width>
             <ZIndex>3</ZIndex>
@@ -2694,7 +2694,7 @@ WHERE counter_name = 'Page life expectancy'
         </ReportItems>
         <KeepTogether>true</KeepTogether>
         <Top>271.25179mm</Top>
-        <Left>2.61573mm</Left>
+        <Left>3.25073mm</Left>
         <Height>14.94583mm</Height>
         <Width>341.3063mm</Width>
         <ZIndex>4</ZIndex>
@@ -3739,7 +3739,7 @@ WHERE counter_name = 'Page life expectancy'
           </Paragraph>
         </Paragraphs>
         <Top>263.40464mm</Top>
-        <Left>2.61573mm</Left>
+        <Left>3.25073mm</Left>
         <Height>6mm</Height>
         <Width>59.925mm</Width>
         <ZIndex>6</ZIndex>
@@ -3771,7 +3771,7 @@ WHERE counter_name = 'Page life expectancy'
           </Paragraph>
         </Paragraphs>
         <Top>245.58365mm</Top>
-        <Left>2.61573mm</Left>
+        <Left>3.25073mm</Left>
         <Height>5.73542mm</Height>
         <Width>39.2813mm</Width>
         <ZIndex>7</ZIndex>
@@ -3805,7 +3805,7 @@ WHERE counter_name = 'Page life expectancy'
         <Value>=iif(Sum(Fields!error.Value, "dsHost3")=0,"nav_plain_green_16","nav_plain_red_16")</Value>
         <Sizing>FitProportional</Sizing>
         <Top>246.53616mm</Top>
-        <Left>43.6609mm</Left>
+        <Left>44.2959mm</Left>
         <Height>4.33002mm</Height>
         <Width>3.57495mm</Width>
         <ZIndex>9</ZIndex>
@@ -9181,7 +9181,7 @@ AVG</Value>
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>=Fields!PLE.Value+"*"</Value>
+                                  <Value>=Fields!PLE.Value</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
