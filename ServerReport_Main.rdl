@@ -26,13 +26,22 @@
           <DataField>ver</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
+        <Field Name="SQLUptime">
+          <DataField>SQLUptime</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
       </Fields>
       <Query>
         <DataSourceName>dsMain</DataSourceName>
-        <CommandText>select @@servername [srv]
-		,convert(varchar(20), getdate(), 106) + ' '+convert(varchar(20), getdate(), 108) + ' (UTC' 
-			+ iif(datediff(hh,getutcdate(),getdate())&gt;0,'+','-')+convert(varchar(2),datediff(hh,getutcdate(),getdate()))+')' [dt]
-		,@@version [ver]</CommandText>
+        <CommandText>SELECT @@servername [srv]
+	,convert(VARCHAR(20), getdate(), 106) + ' ' + convert(VARCHAR(20), getdate(), 108) + ' (UTC' + iif(datediff(hh, getutcdate(), getdate()) &gt; 0, '+', '-') + convert(VARCHAR(2), datediff(hh, getutcdate(), getdate())) + ')' [dt]
+	,@@version [ver]
+	,CASE 
+		WHEN datediff(ss, sqlserver_start_time, getdate()) &gt;= 86400
+			THEN Convert(VARCHAR(5), datediff(ss, sqlserver_start_time, getdate()) / 86400) + ' days '
+		ELSE ''
+		END + Convert(VARCHAR(8), DateAdd(Second, datediff(ss, sqlserver_start_time, getdate()), 0), 108) [SQLUptime]
+FROM sys.dm_os_sys_info</CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
@@ -1598,6 +1607,39 @@ cross join os </CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
+    <DataSet Name="dsPerformance3">
+      <Fields>
+        <Field Name="numa">
+          <DataField>numa</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="val">
+          <DataField>val</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="PLE">
+          <DataField>PLE</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>dsMain</DataSourceName>
+        <CommandText>SELECT 
+	instance_name [numa]
+	,cntr_value [val]
+	,CASE 
+		WHEN cntr_value &gt; 86400
+			THEN convert(VARCHAR(5), cntr_value / 86400) + ' day(s) '
+		ELSE ''
+		END + convert(VARCHAR(10), dateadd(ss, cntr_value, 0), 108) [PLE]
+FROM sys.dm_os_performance_counters
+WHERE counter_name = 'Page life expectancy'
+	AND instance_name &lt;&gt; ''
+
+</CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+    </DataSet>
   </DataSets>
   <Body>
     <ReportItems>
@@ -1645,10 +1687,11 @@ cross join os </CommandText>
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>="Server Time: " + First(Fields!dt.Value, "dsServer")</Value>
+                <Value>="Server Time: " + First(Fields!dt.Value, "dsServer")+chr(10)
++"SQL Uptime: "+ First(Fields!SQLUptime.Value, "dsServer")</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>15pt</FontSize>
+                  <FontSize>12pt</FontSize>
                 </Style>
               </TextRun>
             </TextRuns>
@@ -9010,7 +9053,7 @@ AVG</Value>
             </ChartNoDataMessage>
             <DataSetName>dsPerformance2</DataSetName>
             <Top>0mm</Top>
-            <Left>156.41781mm</Left>
+            <Left>205.94845mm</Left>
             <Height>62.57084mm</Height>
             <Width>93.25625mm</Width>
             <ZIndex>2</ZIndex>
@@ -9036,6 +9079,190 @@ AVG</Value>
           </Border>
         </Style>
       </Rectangle>
+      <Tablix Name="Tablix9">
+        <TablixBody>
+          <TablixColumns>
+            <TablixColumn>
+              <Width>0.72656in</Width>
+            </TablixColumn>
+            <TablixColumn>
+              <Width>1.38009in</Width>
+            </TablixColumn>
+          </TablixColumns>
+          <TablixRows>
+            <TablixRow>
+              <Height>0.23622in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="Textbox19">
+                      <CanGrow>true</CanGrow>
+                      <KeepTogether>true</KeepTogether>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Page Life Expectancy</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <rd:DefaultName>Textbox19</rd:DefaultName>
+                      <Style>
+                        <Border>
+                          <Color>LightGrey</Color>
+                          <Style>Solid</Style>
+                        </Border>
+                        <TopBorder>
+                          <Style>None</Style>
+                        </TopBorder>
+                        <LeftBorder>
+                          <Style>None</Style>
+                        </LeftBorder>
+                        <RightBorder>
+                          <Style>None</Style>
+                        </RightBorder>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>2pt</PaddingTop>
+                        <PaddingBottom>2pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.23622in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="numa">
+                      <CanGrow>true</CanGrow>
+                      <KeepTogether>true</KeepTogether>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>="Numa "+cstr(Fields!numa.Value)</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>9pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                      </Paragraphs>
+                      <rd:DefaultName>numa</rd:DefaultName>
+                      <Style>
+                        <Border>
+                          <Color>LightGrey</Color>
+                          <Style>Solid</Style>
+                        </Border>
+                        <TopBorder>
+                          <Style>None</Style>
+                        </TopBorder>
+                        <LeftBorder>
+                          <Style>None</Style>
+                        </LeftBorder>
+                        <RightBorder>
+                          <Style>None</Style>
+                        </RightBorder>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>2pt</PaddingTop>
+                        <PaddingBottom>2pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="PLE">
+                      <CanGrow>true</CanGrow>
+                      <KeepTogether>true</KeepTogether>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!PLE.Value+"*"</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>9pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                      </Paragraphs>
+                      <rd:DefaultName>PLE</rd:DefaultName>
+                      <Style>
+                        <Border>
+                          <Color>LightGrey</Color>
+                          <Style>Solid</Style>
+                        </Border>
+                        <TopBorder>
+                          <Style>None</Style>
+                        </TopBorder>
+                        <LeftBorder>
+                          <Style>None</Style>
+                        </LeftBorder>
+                        <RightBorder>
+                          <Style>None</Style>
+                        </RightBorder>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>2pt</PaddingTop>
+                        <PaddingBottom>2pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+          </TablixRows>
+        </TablixBody>
+        <TablixColumnHierarchy>
+          <TablixMembers>
+            <TablixMember />
+            <TablixMember />
+          </TablixMembers>
+        </TablixColumnHierarchy>
+        <TablixRowHierarchy>
+          <TablixMembers>
+            <TablixMember>
+              <KeepWithGroup>After</KeepWithGroup>
+            </TablixMember>
+            <TablixMember>
+              <Group Name="Details12" />
+              <TablixMembers>
+                <TablixMember />
+              </TablixMembers>
+            </TablixMember>
+          </TablixMembers>
+        </TablixRowHierarchy>
+        <DataSetName>dsPerformance3</DataSetName>
+        <Top>34.99552mm</Top>
+        <Left>371.75784mm</Left>
+        <Height>12mm</Height>
+        <Width>53.5087mm</Width>
+        <ZIndex>15</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Tablix>
     </ReportItems>
     <Height>328.92437mm</Height>
     <Style>
