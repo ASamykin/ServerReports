@@ -1524,27 +1524,27 @@ option (recompile, maxdop 1)</CommandText>
       <Fields>
         <Field Name="memorytarget">
           <DataField>memorytarget</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="memorytotal">
           <DataField>memorytotal</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="physmemttl">
           <DataField>physmemttl</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="physmemfree">
           <DataField>physmemfree</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="pagefilettl">
           <DataField>pagefilettl</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="pagefilefree">
           <DataField>pagefilefree</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
         <Field Name="memstate">
           <DataField>memstate</DataField>
@@ -1552,7 +1552,7 @@ option (recompile, maxdop 1)</CommandText>
         </Field>
         <Field Name="others">
           <DataField>others</DataField>
-          <rd:TypeName>System.Int64</rd:TypeName>
+          <rd:TypeName>System.Decimal</rd:TypeName>
         </Field>
       </Fields>
       <Query>
@@ -1585,14 +1585,14 @@ option (recompile, maxdop 1)</CommandText>
 	from sys.dm_os_sys_memory
 )
 select
-	 mem_p.TargetServerMemoryKB/1024			[memorytarget]
-	,mem_p.TotalServerMemoryKB/1024			[memorytotal]
-	,os.total_physical_memory_kb/1024		[physmemttl]
-	,os.available_physical_memory_kb/1024	[physmemfree]
-	,os.total_page_file_kb/1024				[pagefilettl]
-	,os.available_page_file_kb/1024			[pagefilefree]
+	 convert(numeric(5,1),mem_p.TargetServerMemoryKB/1024./1024)		[memorytarget]
+	,convert(numeric(5,1),mem_p.TotalServerMemoryKB/1024./1024)			[memorytotal]
+	,convert(numeric(5,1),os.total_physical_memory_kb/1024./1024)		[physmemttl]
+	,convert(numeric(5,1),os.available_physical_memory_kb/1024./1024)	[physmemfree]
+	,convert(numeric(5,1),os.total_page_file_kb/1024./1024)				[pagefilettl]
+	,convert(numeric(5,1),os.available_page_file_kb/1024./1024)			[pagefilefree]
 	,os.system_memory_state_desc        [memstate]
-	,(os.total_physical_memory_kb-mem_p.TotalServerMemoryKB-os.available_physical_memory_kb)/1024 [others]
+	,convert(numeric(5,1),(os.total_physical_memory_kb-mem_p.TotalServerMemoryKB-os.available_physical_memory_kb)/1024./1024) [others]
 from mem_p 
 cross join os </CommandText>
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
@@ -8728,7 +8728,7 @@ AVG</Value>
                     </ChartDataLabel>
                   </ChartEmptyPoints>
                   <ChartItemInLegend>
-                    <LegendText>By SQL server</LegendText>
+                    <LegendText>="By SQL ["+cstr(Fields!memorytotal.Value)+"]"</LegendText>
                   </ChartItemInLegend>
                   <ValueAxisName>Primary</ValueAxisName>
                   <CategoryAxisName>Primary</CategoryAxisName>
@@ -8767,7 +8767,7 @@ AVG</Value>
                     </ChartDataLabel>
                   </ChartEmptyPoints>
                   <ChartItemInLegend>
-                    <LegendText>By other processes</LegendText>
+                    <LegendText>="By others ["+cstr(Fields!others.Value)+"]"</LegendText>
                   </ChartItemInLegend>
                   <ValueAxisName>Primary</ValueAxisName>
                   <CategoryAxisName>Primary</CategoryAxisName>
@@ -8806,7 +8806,7 @@ AVG</Value>
                     </ChartDataLabel>
                   </ChartEmptyPoints>
                   <ChartItemInLegend>
-                    <LegendText>Free RAM</LegendText>
+                    <LegendText>="Free [" +cstr(Fields!physmemfree.Value)+"]"</LegendText>
                   </ChartItemInLegend>
                   <ValueAxisName>Primary</ValueAxisName>
                   <CategoryAxisName>Primary</CategoryAxisName>
@@ -8895,7 +8895,7 @@ AVG</Value>
                       <FontSize>8pt</FontSize>
                     </Style>
                     <ChartAxisTitle>
-                      <Caption>Physical memory (MB)</Caption>
+                      <Caption>Physical memory (GB)</Caption>
                       <Style>
                         <FontSize>8pt</FontSize>
                       </Style>
@@ -8921,7 +8921,7 @@ AVG</Value>
                     </ChartMinorTickMarks>
                     <CrossAt>NaN</CrossAt>
                     <Minimum>NaN</Minimum>
-                    <Maximum>=Fields!physmemttl.Value</Maximum>
+                    <Maximum>=Fields!physmemttl.Value+Fields!physmemttl.Value*0.03</Maximum>
                   </ChartAxis>
                   <ChartAxis Name="Secondary">
                     <Style>
@@ -9012,7 +9012,7 @@ AVG</Value>
             <Top>0mm</Top>
             <Left>156.41781mm</Left>
             <Height>62.57084mm</Height>
-            <Width>75mm</Width>
+            <Width>93.25625mm</Width>
             <ZIndex>2</ZIndex>
             <Style>
               <Border>
