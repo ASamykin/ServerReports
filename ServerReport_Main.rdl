@@ -1458,6 +1458,146 @@ option (recompile)
         <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
       </Query>
     </DataSet>
+    <DataSet Name="dsPerformance1">
+      <Fields>
+        <Field Name="DateTime">
+          <DataField>DateTime</DataField>
+          <rd:TypeName>System.DateTime</rd:TypeName>
+        </Field>
+        <Field Name="SQL">
+          <DataField>SQL</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="OS">
+          <DataField>OS</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="recs">
+          <DataField>recs</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="SQLMin">
+          <DataField>SQLMin</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="SQLMax">
+          <DataField>SQLMax</DataField>
+          <rd:TypeName>System.Int32</rd:TypeName>
+        </Field>
+        <Field Name="STDEV">
+          <DataField>STDEV</DataField>
+          <rd:TypeName>System.Double</rd:TypeName>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>dsMain</DataSourceName>
+        <CommandText>
+SELECT 
+		dateadd(mi,datediff(mi,0,DATEADD (ms, a.[Record Time] - sys.ms_ticks, GETDATE())),0) AS [DateTime]
+		,avg(a.[ProcessUtilization]) [SQL]
+		,avg(100-a.[SystemIdle %]-a.[ProcessUtilization]) [OS]
+		,count(1) [recs]
+		,min(a.[ProcessUtilization]) [SQLMin]
+		,max(a.[ProcessUtilization]) [SQLMax]
+		,isnull(STDEV(a.[ProcessUtilization]),0) [STDEV]
+FROM   (SELECT x.value('(//Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS [ProcessUtilization],    
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS [SystemIdle %],   
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/UserModeTime) [1]', 'bigint') AS [UserModeTime],   
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/KernelModeTime) [1]', 'bigint') AS [KernelModeTime],    
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/PageFaults) [1]', 'bigint') AS [PageFaults],   
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/WorkingSetDelta) [1]', 'bigint')/1024 AS [WorkingSetDelta],   
+                     x.value('(//Record/SchedulerMonitorEvent/SystemHealth/MemoryUtilization) [1]', 'bigint') AS [MemoryUtilization (%workingset)],   
+                     x.value('(//Record/@time)[1]', 'bigint') AS [Record Time]  
+       FROM (SELECT CAST (record as xml) 
+                     FROM sys.dm_os_ring_buffers    
+                     WHERE ring_buffer_type = 'RING_BUFFER_SCHEDULER_MONITOR') AS R(x)) a  
+              CROSS JOIN sys.dm_os_sys_info sys
+where a.[ProcessUtilization] is not null
+group by 
+	dateadd(mi,datediff(mi,0,DATEADD (ms, a.[Record Time] - sys.ms_ticks, GETDATE())),0)
+
+option (recompile, maxdop 1)</CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+    </DataSet>
+    <DataSet Name="dsPerformance2">
+      <Fields>
+        <Field Name="memorytarget">
+          <DataField>memorytarget</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="memorytotal">
+          <DataField>memorytotal</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="physmemttl">
+          <DataField>physmemttl</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="physmemfree">
+          <DataField>physmemfree</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="pagefilettl">
+          <DataField>pagefilettl</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="pagefilefree">
+          <DataField>pagefilefree</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+        <Field Name="memstate">
+          <DataField>memstate</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="others">
+          <DataField>others</DataField>
+          <rd:TypeName>System.Int64</rd:TypeName>
+        </Field>
+      </Fields>
+      <Query>
+        <DataSourceName>dsMain</DataSourceName>
+        <CommandText>;with mem as 
+(
+	select counter_name
+			,cntr_value 
+	from sys.dm_os_performance_counters 
+	where 
+		counter_name in ('Target Server Memory (KB)','Total Server Memory (KB)')
+)
+,mem_p (TargetServerMemoryKB,TotalServerMemoryKB) as 
+(
+	select 
+		[Target Server Memory (KB)]
+		,[Total Server Memory (KB)]
+	from mem
+	pivot 
+	(max(cntr_value) for counter_name in([Target Server Memory (KB)],[Total Server Memory (KB)])) p
+)
+,os as 
+(
+	select 
+		total_physical_memory_kb 
+		,available_physical_memory_kb
+		,total_page_file_kb
+		,available_page_file_kb
+		,system_memory_state_desc
+	from sys.dm_os_sys_memory
+)
+select
+	 mem_p.TargetServerMemoryKB/1024			[memorytarget]
+	,mem_p.TotalServerMemoryKB/1024			[memorytotal]
+	,os.total_physical_memory_kb/1024		[physmemttl]
+	,os.available_physical_memory_kb/1024	[physmemfree]
+	,os.total_page_file_kb/1024				[pagefilettl]
+	,os.available_page_file_kb/1024			[pagefilefree]
+	,os.system_memory_state_desc        [memstate]
+	,(os.total_physical_memory_kb-mem_p.TotalServerMemoryKB-os.available_physical_memory_kb)/1024 [others]
+from mem_p 
+cross join os </CommandText>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+      </Query>
+    </DataSet>
   </DataSets>
   <Body>
     <ReportItems>
@@ -1498,38 +1638,6 @@ option (recompile)
           <PaddingBottom>2pt</PaddingBottom>
         </Style>
       </Textbox>
-      <Textbox Name="Textbox10">
-        <CanGrow>true</CanGrow>
-        <KeepTogether>true</KeepTogether>
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>Performance data :  CPU usage, Blocked processes, Running</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                </Style>
-              </TextRun>
-            </TextRuns>
-            <Style />
-          </Paragraph>
-        </Paragraphs>
-        <rd:DefaultName>Textbox10</rd:DefaultName>
-        <Top>233.807mm</Top>
-        <Left>3.6257mm</Left>
-        <Height>29.8125mm</Height>
-        <Width>177.80228mm</Width>
-        <ZIndex>1</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-          <PaddingLeft>2pt</PaddingLeft>
-          <PaddingRight>2pt</PaddingRight>
-          <PaddingTop>2pt</PaddingTop>
-          <PaddingBottom>2pt</PaddingBottom>
-        </Style>
-      </Textbox>
       <Textbox Name="Textbox11">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
@@ -1554,7 +1662,7 @@ option (recompile)
         <Left>180.15808mm</Left>
         <Height>11.21833mm</Height>
         <Width>164.77392mm</Width>
-        <ZIndex>2</ZIndex>
+        <ZIndex>1</ZIndex>
         <Style>
           <Border>
             <Color>Gainsboro</Color>
@@ -1584,11 +1692,11 @@ option (recompile)
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>54.2488mm</Top>
-        <Left>3.88408mm</Left>
+        <Top>170.18828mm</Top>
+        <Left>3.62506mm</Left>
         <Height>6.52917mm</Height>
         <Width>51.19376mm</Width>
-        <ZIndex>3</ZIndex>
+        <ZIndex>2</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1848,7 +1956,7 @@ option (recompile)
             </TablixRowHierarchy>
             <DataSetName>dsHost2</DataSetName>
             <Top>1.07875mm</Top>
-            <Left>78.38444mm</Left>
+            <Left>78.38445mm</Left>
             <Height>5.99999mm</Height>
             <Width>97.88957mm</Width>
             <ZIndex>1</ZIndex>
@@ -1980,7 +2088,7 @@ option (recompile)
             </TablixRowHierarchy>
             <DataSetName>dsHost3</DataSetName>
             <Top>1.07875mm</Top>
-            <Left>184.35003mm</Left>
+            <Left>184.34999mm</Left>
             <Height>5.99999mm</Height>
             <Width>140.22274mm</Width>
             <ZIndex>2</ZIndex>
@@ -1992,11 +2100,11 @@ option (recompile)
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>19.5439mm</Top>
-        <Left>3.88407mm</Left>
+        <Top>247.171mm</Top>
+        <Left>2.87411mm</Left>
         <Height>7.80208mm</Height>
         <Width>341.17711mm</Width>
-        <ZIndex>4</ZIndex>
+        <ZIndex>3</ZIndex>
         <Visibility>
           <Hidden>true</Hidden>
           <ToggleItem>txtHostInfo</ToggleItem>
@@ -2260,7 +2368,7 @@ option (recompile)
             </TablixRowHierarchy>
             <DataSetName>dsSQL2</DataSetName>
             <Top>1.66082mm</Top>
-            <Left>111.71877mm</Left>
+            <Left>111.71876mm</Left>
             <Height>5.99999mm</Height>
             <Width>77.78141mm</Width>
             <ZIndex>1</ZIndex>
@@ -2543,11 +2651,11 @@ option (recompile)
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>37.59201mm</Top>
-        <Left>3.6257mm</Left>
+        <Top>265.21913mm</Top>
+        <Left>2.61573mm</Left>
         <Height>14.94583mm</Height>
         <Width>341.3063mm</Width>
-        <ZIndex>5</ZIndex>
+        <ZIndex>4</ZIndex>
         <Visibility>
           <Hidden>true</Hidden>
           <ToggleItem>txtSQLConfig</ToggleItem>
@@ -3199,8 +3307,8 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsMaint1</DataSetName>
-            <Top>9.12846mm</Top>
-            <Left>1.45213mm</Left>
+            <Top>9.12847mm</Top>
+            <Left>1.45211mm</Left>
             <Height>17.99996mm</Height>
             <Width>144.8435mm</Width>
             <Visibility>
@@ -3233,7 +3341,7 @@ option (recompile)
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
             <Top>0.8354mm</Top>
-            <Left>1.45213mm</Left>
+            <Left>1.45211mm</Left>
             <Height>6.52917mm</Height>
             <Width>94.84359mm</Width>
             <ZIndex>1</ZIndex>
@@ -3268,7 +3376,7 @@ option (recompile)
             </Paragraphs>
             <rd:DefaultName>Textbox1</rd:DefaultName>
             <Top>34.89231mm</Top>
-            <Left>1.45213mm</Left>
+            <Left>1.45211mm</Left>
             <Height>6mm</Height>
             <Width>94.84359mm</Width>
             <ZIndex>2</ZIndex>
@@ -3502,10 +3610,10 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsMaint4</DataSetName>
-            <Top>42.30342mm</Top>
-            <Left>1.45213mm</Left>
+            <Top>42.30343mm</Top>
+            <Left>1.45211mm</Left>
             <Height>11.99998mm</Height>
-            <Width>94.84359mm</Width>
+            <Width>94.8436mm</Width>
             <ZIndex>3</ZIndex>
             <Visibility>
               <Hidden>=iif(CountRows("dsMaint4")=0,true,false)</Hidden>
@@ -3536,7 +3644,7 @@ option (recompile)
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
             <Top>27.4812mm</Top>
-            <Left>1.45208mm</Left>
+            <Left>1.45206mm</Left>
             <Height>6mm</Height>
             <Width>94.84364mm</Width>
             <ZIndex>4</ZIndex>
@@ -3556,11 +3664,11 @@ option (recompile)
           </Textbox>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>62.54187mm</Top>
-        <Left>3.6257mm</Left>
+        <Top>178.48133mm</Top>
+        <Left>3.36668mm</Left>
         <Height>58.60209mm</Height>
         <Width>147.23132mm</Width>
-        <ZIndex>6</ZIndex>
+        <ZIndex>5</ZIndex>
         <Visibility>
           <Hidden>true</Hidden>
           <ToggleItem>txtMaint</ToggleItem>
@@ -3588,11 +3696,11 @@ option (recompile)
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>29.74486mm</Top>
-        <Left>3.6257mm</Left>
+        <Top>257.37197mm</Top>
+        <Left>2.61573mm</Left>
         <Height>6mm</Height>
         <Width>59.925mm</Width>
-        <ZIndex>7</ZIndex>
+        <ZIndex>6</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -3620,11 +3728,11 @@ option (recompile)
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>11.92389mm</Top>
-        <Left>3.6257mm</Left>
+        <Top>239.55099mm</Top>
+        <Left>2.61573mm</Left>
         <Height>5.73542mm</Height>
         <Width>39.2813mm</Width>
-        <ZIndex>8</ZIndex>
+        <ZIndex>7</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -3639,11 +3747,11 @@ option (recompile)
         <Source>Embedded</Source>
         <Value>=iif(CountRows("dsMaint1")=0,"nav_plain_green_16","nav_plain_red_16")</Value>
         <Sizing>FitProportional</Sizing>
-        <Top>55.84824mm</Top>
-        <Left>59.97575mm</Left>
+        <Top>171.78771mm</Top>
+        <Left>59.71673mm</Left>
         <Height>4.33002mm</Height>
         <Width>3.57495mm</Width>
-        <ZIndex>9</ZIndex>
+        <ZIndex>8</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -3654,30 +3762,17 @@ option (recompile)
         <Source>Embedded</Source>
         <Value>=iif(Sum(Fields!error.Value, "dsHost3")=0,"nav_plain_green_16","nav_plain_red_16")</Value>
         <Sizing>FitProportional</Sizing>
-        <Top>12.87639mm</Top>
-        <Left>44.67088mm</Left>
+        <Top>240.50349mm</Top>
+        <Left>43.6609mm</Left>
         <Height>4.33002mm</Height>
         <Width>3.57495mm</Width>
-        <ZIndex>10</ZIndex>
+        <ZIndex>9</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
         </Style>
       </Image>
-      <Rectangle Name="Rectangle4">
-        <KeepTogether>true</KeepTogether>
-        <Top>265.71548mm</Top>
-        <Left>3.36735mm</Left>
-        <Height>25mm</Height>
-        <Width>341.43549mm</Width>
-        <ZIndex>11</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Rectangle>
       <Rectangle Name="Rectangle5">
         <ReportItems>
           <Textbox Name="Textbox13">
@@ -4836,10 +4931,10 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsDatabases1</DataSetName>
-            <Top>9.57793mm</Top>
+            <Top>9.57794mm</Top>
             <Left>9.8425mm</Left>
-            <Height>15.96875mm</Height>
-            <Width>182.11188mm</Width>
+            <Height>15.96873mm</Height>
+            <Width>182.11216mm</Width>
             <ZIndex>1</ZIndex>
             <Style>
               <Border>
@@ -4887,6 +4982,9 @@ option (recompile)
                         <Style />
                       </ChartMarker>
                       <DataElementOutput>Output</DataElementOutput>
+                      <ChartItemInLegend>
+                        <LegendText>=Fields!db.Value+" ["+cstr(Fields!SizeMB.Value)+"]"</LegendText>
+                      </ChartItemInLegend>
                     </ChartDataPoint>
                   </ChartDataPoints>
                   <Type>Shape</Type>
@@ -5058,6 +5156,7 @@ option (recompile)
                 <Style>
                   <BackgroundGradientType>None</BackgroundGradientType>
                   <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>8pt</FontSize>
                 </Style>
                 <Position>RightCenter</Position>
                 <ChartLegendTitle>
@@ -5075,7 +5174,7 @@ option (recompile)
             </ChartLegends>
             <ChartTitles>
               <ChartTitle Name="Default">
-                <Caption>Top 5 Databases (GBs)</Caption>
+                <Caption>Top 5 DBs by Size (GBs)</Caption>
                 <Style>
                   <BackgroundGradientType>None</BackgroundGradientType>
                   <FontFamily>Segoe UI</FontFamily>
@@ -5104,7 +5203,7 @@ option (recompile)
             <DataSetName>dsDatabases2</DataSetName>
             <Top>0.3175mm</Top>
             <Left>221.05636mm</Left>
-            <Height>57.66249mm</Height>
+            <Height>69.03956mm</Height>
             <Width>120.24994mm</Width>
             <ZIndex>2</ZIndex>
             <Style>
@@ -5194,11 +5293,11 @@ option (recompile)
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Consumed  </Value>
+                                  <Value>TOP 5 Consumers of</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
+                                    <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
                               </TextRuns>
@@ -5422,7 +5521,7 @@ option (recompile)
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>by databases</Value>
+                                  <Value>Database</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
@@ -5430,7 +5529,7 @@ option (recompile)
                                 </TextRun>
                               </TextRuns>
                               <Style>
-                                <TextAlign>Center</TextAlign>
+                                <TextAlign>Left</TextAlign>
                               </Style>
                             </Paragraph>
                           </Paragraphs>
@@ -6116,10 +6215,19 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsDatabases3</DataSetName>
-            <Top>29.85055mm</Top>
+            <Filters>
+              <Filter>
+                <FilterExpression>=Fields!IORank.Value</FilterExpression>
+                <Operator>LessThanOrEqual</Operator>
+                <FilterValues>
+                  <FilterValue DataType="Integer">5</FilterValue>
+                </FilterValues>
+              </Filter>
+            </Filters>
+            <Top>29.85056mm</Top>
             <Left>3.89257mm</Left>
-            <Height>17.99998mm</Height>
-            <Width>213.63771mm</Width>
+            <Height>17.99996mm</Height>
+            <Width>213.63735mm</Width>
             <ZIndex>3</ZIndex>
             <Style>
               <Border>
@@ -6129,321 +6237,17 @@ option (recompile)
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>123.54285mm</Top>
-        <Left>3.6257mm</Left>
-        <Height>57.97999mm</Height>
+        <Top>100.01322mm</Top>
+        <Left>2.7908mm</Left>
+        <Height>69.35707mm</Height>
         <Width>341.69383mm</Width>
-        <ZIndex>12</ZIndex>
+        <ZIndex>10</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
         </Style>
       </Rectangle>
-      <Tablix Name="Tablix9">
-        <TablixBody>
-          <TablixColumns>
-            <TablixColumn>
-              <Width>0.98425in</Width>
-            </TablixColumn>
-            <TablixColumn>
-              <Width>0.98425in</Width>
-            </TablixColumn>
-            <TablixColumn>
-              <Width>0.98425in</Width>
-            </TablixColumn>
-          </TablixColumns>
-          <TablixRows>
-            <TablixRow>
-              <Height>0.23622in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox51">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox51</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <BackgroundColor>WhiteSmoke</BackgroundColor>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox53">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox53</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <BackgroundColor>WhiteSmoke</BackgroundColor>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox55">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox55</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <BackgroundColor>WhiteSmoke</BackgroundColor>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.23622in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox52">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox52</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox54">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox54</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="Textbox56">
-                      <CanGrow>true</CanGrow>
-                      <KeepTogether>true</KeepTogether>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value />
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style />
-                        </Paragraph>
-                      </Paragraphs>
-                      <rd:DefaultName>Textbox56</rd:DefaultName>
-                      <Style>
-                        <Border>
-                          <Color>LightGrey</Color>
-                          <Style>Solid</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>None</Style>
-                        </TopBorder>
-                        <LeftBorder>
-                          <Style>None</Style>
-                        </LeftBorder>
-                        <RightBorder>
-                          <Style>None</Style>
-                        </RightBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>2pt</PaddingTop>
-                        <PaddingBottom>2pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-          </TablixRows>
-        </TablixBody>
-        <TablixColumnHierarchy>
-          <TablixMembers>
-            <TablixMember />
-            <TablixMember />
-            <TablixMember />
-          </TablixMembers>
-        </TablixColumnHierarchy>
-        <TablixRowHierarchy>
-          <TablixMembers>
-            <TablixMember>
-              <KeepWithGroup>After</KeepWithGroup>
-            </TablixMember>
-            <TablixMember>
-              <Group Name="Details12" />
-            </TablixMember>
-          </TablixMembers>
-        </TablixRowHierarchy>
-        <DataSetName>dsDatabases1</DataSetName>
-        <Top>177.28672mm</Top>
-        <Left>359.2195mm</Left>
-        <Height>12mm</Height>
-        <Width>75mm</Width>
-        <ZIndex>13</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Tablix>
       <Rectangle Name="Rectangle6">
         <ReportItems>
           <Textbox Name="Textbox22">
@@ -6466,7 +6270,7 @@ option (recompile)
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox22</rd:DefaultName>
-            <Top>28.7625mm</Top>
+            <Top>28.76249mm</Top>
             <Left>5.55625mm</Left>
             <Height>6mm</Height>
             <Width>174.94772mm</Width>
@@ -6783,7 +6587,7 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsMaint2</DataSetName>
-            <Top>8.29306mm</Top>
+            <Top>8.29307mm</Top>
             <Left>5.55625mm</Left>
             <Height>11.99998mm</Height>
             <Width>174.94784mm</Width>
@@ -6816,7 +6620,7 @@ option (recompile)
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
-            <Top>20.99861mm</Top>
+            <Top>20.99862mm</Top>
             <Left>5.55625mm</Left>
             <Height>6mm</Height>
             <Width>174.94773mm</Width>
@@ -7140,7 +6944,7 @@ option (recompile)
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsMaint3</DataSetName>
-            <Top>36.52639mm</Top>
+            <Top>36.5264mm</Top>
             <Left>5.55625mm</Left>
             <Height>11.99998mm</Height>
             <Width>174.94759mm</Width>
@@ -7173,7 +6977,7 @@ option (recompile)
               </Paragraph>
             </Paragraphs>
             <rd:DefaultName>Textbox12</rd:DefaultName>
-            <Top>49.93748mm</Top>
+            <Top>49.93747mm</Top>
             <Left>5.55629mm</Left>
             <Height>6mm</Height>
             <Width>174.94773mm</Width>
@@ -7194,11 +6998,11 @@ option (recompile)
           </Textbox>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>62.80381mm</Top>
-        <Left>153.8966mm</Left>
+        <Top>178.74328mm</Top>
+        <Left>153.63756mm</Left>
         <Height>58.34015mm</Height>
         <Width>182.55626mm</Width>
-        <ZIndex>14</ZIndex>
+        <ZIndex>11</ZIndex>
         <Visibility>
           <Hidden>true</Hidden>
           <ToggleItem>txtMaint</ToggleItem>
@@ -8490,10 +8294,10 @@ AVG</Value>
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>dsDisks1</DataSetName>
-            <Top>6.35278mm</Top>
+            <Top>6.35276mm</Top>
             <Left>3.63402mm</Left>
-            <Height>12mm</Height>
-            <Width>337.28471mm</Width>
+            <Height>11.99998mm</Height>
+            <Width>337.28424mm</Width>
             <ZIndex>1</ZIndex>
             <Style>
               <Border>
@@ -8503,11 +8307,11 @@ AVG</Value>
           </Tablix>
         </ReportItems>
         <KeepTogether>true</KeepTogether>
-        <Top>183.95944mm</Top>
-        <Left>3.88407mm</Left>
-        <Height>28.66319mm</Height>
+        <Top>77.31694mm</Top>
+        <Left>3.36665mm</Left>
+        <Height>20.46111mm</Height>
         <Width>340.91875mm</Width>
-        <ZIndex>15</ZIndex>
+        <ZIndex>12</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -8529,11 +8333,11 @@ AVG</Value>
           </Paragraph>
         </Paragraphs>
         <rd:DefaultName>Textbox92</rd:DefaultName>
-        <Top>233.807mm</Top>
-        <Left>186.10178mm</Left>
+        <Top>243.06742mm</Top>
+        <Left>355.17053mm</Left>
         <Height>29.8125mm</Height>
-        <Width>158.70104mm</Width>
-        <ZIndex>16</ZIndex>
+        <Width>158.70105mm</Width>
+        <ZIndex>13</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -8544,15 +8348,703 @@ AVG</Value>
           <PaddingBottom>2pt</PaddingBottom>
         </Style>
       </Textbox>
+      <Rectangle Name="Rectangle8">
+        <ReportItems>
+          <Textbox Name="Textbox10">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Performance data :  CPU usage, Blocked processes, Running</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <rd:DefaultName>Textbox10</rd:DefaultName>
+            <Top>0mm</Top>
+            <Left>0mm</Left>
+            <Height>6.79375mm</Height>
+            <Width>96.29572mm</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Chart Name="Chart6">
+            <ChartCategoryHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart6_CategoryGroup1">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!DateTime.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <Label>=Fields!DateTime.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartCategoryHierarchy>
+            <ChartSeriesHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Label>SQL</Label>
+                </ChartMember>
+                <ChartMember>
+                  <Label>OS</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartSeriesHierarchy>
+            <ChartData>
+              <ChartSeriesCollection>
+                <ChartSeries Name="SQL">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!SQL.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style />
+                      <ChartMarker>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Subtype>Stacked</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ChartItemInLegend>
+                    <LegendText>SQL</LegendText>
+                  </ChartItemInLegend>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+                <ChartSeries Name="OS">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!OS.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style />
+                      <ChartMarker>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Subtype>Stacked</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ChartItemInLegend>
+                    <LegendText>OS</LegendText>
+                  </ChartItemInLegend>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+              </ChartSeriesCollection>
+            </ChartData>
+            <ChartAreas>
+              <ChartArea Name="Default">
+                <ChartCategoryAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                      <Format>HH:mm</Format>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Axis Title</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                </ChartCategoryAxes>
+                <ChartValueAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>CPU (%)</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>100</Maximum>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Axis Title</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                </ChartValueAxes>
+                <Style>
+                  <BackgroundColor>WhiteSmoke</BackgroundColor>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                </Style>
+              </ChartArea>
+            </ChartAreas>
+            <ChartLegends>
+              <ChartLegend Name="Default">
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>8pt</FontSize>
+                </Style>
+                <Position>TopCenter</Position>
+                <ChartLegendTitle>
+                  <Caption />
+                  <Style>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Bold</FontWeight>
+                    <TextAlign>Center</TextAlign>
+                  </Style>
+                </ChartLegendTitle>
+                <HeaderSeparatorColor>Black</HeaderSeparatorColor>
+                <ColumnSeparatorColor>Black</ColumnSeparatorColor>
+              </ChartLegend>
+            </ChartLegends>
+            <Palette>BrightPastel</Palette>
+            <ChartBorderSkin>
+              <Style>
+                <BackgroundColor>Gray</BackgroundColor>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <Color>White</Color>
+              </Style>
+            </ChartBorderSkin>
+            <ChartNoDataMessage Name="NoDataMessage">
+              <Caption>No Data Available</Caption>
+              <Style>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <TextAlign>General</TextAlign>
+                <VerticalAlign>Top</VerticalAlign>
+              </Style>
+            </ChartNoDataMessage>
+            <DataSetName>dsPerformance1</DataSetName>
+            <Top>8.25497mm</Top>
+            <Left>0mm</Left>
+            <Height>50mm</Height>
+            <Width>150.67084mm</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Color>LightGrey</Color>
+                <Style>None</Style>
+              </Border>
+              <BackgroundColor>White</BackgroundColor>
+              <BackgroundGradientType>None</BackgroundGradientType>
+            </Style>
+          </Chart>
+          <Chart Name="Chart1">
+            <ChartCategoryHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Label>memorytotal</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartCategoryHierarchy>
+            <ChartSeriesHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Label>memorytotal</Label>
+                </ChartMember>
+                <ChartMember>
+                  <Label>others</Label>
+                </ChartMember>
+                <ChartMember>
+                  <Label>physmemfree</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartSeriesHierarchy>
+            <ChartData>
+              <ChartSeriesCollection>
+                <ChartSeries Name="memorytotal">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!memorytotal.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style />
+                      <ChartMarker>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Subtype>Stacked</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ChartItemInLegend>
+                    <LegendText>By SQL server</LegendText>
+                  </ChartItemInLegend>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+                <ChartSeries Name="others">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!others.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style>
+                        <Color>DarkGray</Color>
+                      </Style>
+                      <ChartMarker>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Subtype>Stacked</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ChartItemInLegend>
+                    <LegendText>By other processes</LegendText>
+                  </ChartItemInLegend>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+                <ChartSeries Name="physmemfree">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!physmemfree.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style>
+                        <Color>LightGrey</Color>
+                      </Style>
+                      <ChartMarker>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Subtype>Stacked</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ChartItemInLegend>
+                    <LegendText>Free RAM</LegendText>
+                  </ChartItemInLegend>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+              </ChartSeriesCollection>
+            </ChartData>
+            <ChartAreas>
+              <ChartArea Name="Default">
+                <ChartCategoryAxes>
+                  <ChartAxis Name="Primary">
+                    <Visible>False</Visible>
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Axis Title</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                </ChartCategoryAxes>
+                <ChartValueAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Physical memory (MB)</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <Interval>=cint(Fields!physmemttl.Value/4)</Interval>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>=Fields!physmemttl.Value</Maximum>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <FontSize>8pt</FontSize>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Axis Title</Caption>
+                      <Style>
+                        <FontSize>8pt</FontSize>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMinorTickMarks>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                  </ChartAxis>
+                </ChartValueAxes>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                </Style>
+              </ChartArea>
+            </ChartAreas>
+            <ChartLegends>
+              <ChartLegend Name="Default">
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>8pt</FontSize>
+                </Style>
+                <Position>RightCenter</Position>
+                <ChartLegendTitle>
+                  <Caption />
+                  <Style>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Bold</FontWeight>
+                    <TextAlign>Center</TextAlign>
+                  </Style>
+                </ChartLegendTitle>
+                <HeaderSeparatorColor>Black</HeaderSeparatorColor>
+                <ColumnSeparatorColor>Black</ColumnSeparatorColor>
+              </ChartLegend>
+            </ChartLegends>
+            <ChartTitles>
+              <ChartTitle Name="Default">
+                <Caption>=Fields!memstate.Value</Caption>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontWeight>Bold</FontWeight>
+                  <TextAlign>General</TextAlign>
+                  <VerticalAlign>Top</VerticalAlign>
+                </Style>
+              </ChartTitle>
+            </ChartTitles>
+            <Palette>BrightPastel</Palette>
+            <ChartBorderSkin>
+              <Style>
+                <BackgroundColor>Gray</BackgroundColor>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <Color>White</Color>
+              </Style>
+            </ChartBorderSkin>
+            <ChartNoDataMessage Name="NoDataMessage">
+              <Caption>No Data Available</Caption>
+              <Style>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <TextAlign>General</TextAlign>
+                <VerticalAlign>Top</VerticalAlign>
+              </Style>
+            </ChartNoDataMessage>
+            <DataSetName>dsPerformance2</DataSetName>
+            <Top>0mm</Top>
+            <Left>156.41781mm</Left>
+            <Height>62.57084mm</Height>
+            <Width>75mm</Width>
+            <ZIndex>2</ZIndex>
+            <Style>
+              <Border>
+                <Color>LightGrey</Color>
+                <Style>Solid</Style>
+              </Border>
+              <BackgroundColor>White</BackgroundColor>
+              <BackgroundGradientType>None</BackgroundGradientType>
+            </Style>
+          </Chart>
+        </ReportItems>
+        <KeepTogether>true</KeepTogether>
+        <Top>12.98222mm</Top>
+        <Left>3.36665mm</Left>
+        <Height>62.57084mm</Height>
+        <Width>341.43549mm</Width>
+        <ZIndex>14</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Rectangle>
     </ReportItems>
-    <Height>290.71548mm</Height>
+    <Height>328.92437mm</Height>
     <Style>
       <Border>
         <Style>None</Style>
       </Border>
     </Style>
   </Body>
-  <Width>587.67782mm</Width>
+  <Width>700.40307mm</Width>
   <Page>
     <LeftMargin>25.4mm</LeftMargin>
     <RightMargin>25.4mm</RightMargin>
